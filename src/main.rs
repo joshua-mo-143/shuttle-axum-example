@@ -97,45 +97,62 @@ async fn retrieve_record_by_id(
 async fn create_record(
     State(state): State<AppState>,
     Json(json): Json<UserSubmission>
-    ) -> StatusCode {
+    ) -> Result<impl IntoResponse, impl IntoResponse> {
 
-    sqlx::query("INSERT INTO USERS (name, age) VALUES ($1, $2)")
+    if let Err(e) = sqlx::query("INSERT INTO USERS (name, age) VALUES ($1, $2)")
         .bind(json.name)
         .bind(json.age)
         .execute(&state.db)
-        .await.unwrap();
-
-    StatusCode::CREATED 
+        .await {
+            return Err(
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Something went wrong: {e}")
+                ) 
+                );
+        }
+    Ok(StatusCode::CREATED) 
 } 
 
 async fn update_record_by_id(
     State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(json): Json<UpdateRecord>
-    ) -> StatusCode {
+    ) -> Result<impl IntoResponse, impl IntoResponse> {
 
-    sqlx::query("UPDATE USERS 
+    if let Err(e) = sqlx::query("UPDATE USERS 
                 SET
-                (case when $1 is not null then name = $1 else name = name end),
-                (case when $2 is not null then age = $2 else age = age end)
+                 name = (case when $1 is not null then $1 else name end),
+                 age = (case when $2 is not null then $2 else age end) 
                 WHERE id = $3")
         .bind(json.name)
         .bind(json.age)
         .bind(id)
         .execute(&state.db)
-        .await.unwrap();
+        .await {
+            return Err((
+                       StatusCode::INTERNAL_SERVER_ERROR, 
+                    format!("Something went wrong: {e}")
+                    ));
+        }
 
-    StatusCode::CREATED 
+    Ok(StatusCode::OK)
 } 
+
 async fn delete_record_by_id(
     State(state): State<AppState>,
     Path(id): Path<i32>
-    ) -> StatusCode {
+    ) -> Result<impl IntoResponse, impl IntoResponse> {
 
-    sqlx::query("DELETE FROM USERS WHERE ID = $1")
+    if let Err(e) = sqlx::query("DELETE FROM USERS WHERE ID = $1")
         .bind(id)
         .execute(&state.db)
-        .await.unwrap();
+        .await {
+            return Err((
+                       StatusCode::INTERNAL_SERVER_ERROR, 
+                    format!("Something went wrong: {e}")
+                    )); 
+        }
 
-    StatusCode::OK 
+    Ok(StatusCode::OK)
 } 
